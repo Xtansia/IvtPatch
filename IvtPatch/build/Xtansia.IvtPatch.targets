@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  - This Source Code Form is subject to the terms of the Mozilla Public
+  - License, v. 2.0. If a copy of the MPL was not distributed with this
+  - file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ -->
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+    <PropertyGroup>
+        <IntermediateIvtPatchDir Condition="'$(IntermediateIvtPatchDir)' == ''">$(IntermediateOutputPath)ivt_patch\</IntermediateIvtPatchDir>
+        <IntermediateIvtPatchDir Condition="!HasTrailingSlash('$(IntermediateIvtPatchDir)')">$(IntermediateIvtPatchDir)\</IntermediateIvtPatchDir>
+    </PropertyGroup>
+
+    <Target Name="IvtPatch"
+            DependsOnTargets="_RunIvtPatch"
+            AfterTargets="ILLink">
+        <ItemGroup>
+            <ResolvedFileToPublish Remove="@(ManagedAssemblyToIvtPatch)" />
+            <ResolvedFileToPublish Remove="@(ManagedAssemblyToIvtPatch->'%(TrimmedAssembly)')" />
+            <ResolvedFileToPublish Include="@(_IvtPatchedResolvedFileToPublish)" />
+        </ItemGroup>
+    </Target>
+
+    <Target Name="_RunIvtPatch"
+            DependsOnTargets="_ComputeManagedAssemblyToIvtPatch"
+            Inputs="@(ManagedAssemblyToIvtPatch);@(ReferencePath)"
+            Outputs="@(_IvtPatchedResolvedFileToPublish)">
+        <Delete Files="@(_IvtPatchedResolvedFileToPublish)" />
+        <IvtPatch AssemblyPaths="@(ManagedAssemblyToIvtPatch)"
+                  ReferenceAssemblyPaths="@(ReferencePath)"
+                  OutputDirectory="$(IntermediateIvtPatchDir)" />
+    </Target>
+
+    <Target Name="_ComputeManagedAssemblyToIvtPatch"
+            DependsOnTargets="_RunILLink">
+        <ItemGroup>
+            <_IvtPatchAssembly Include="@(IvtPatchAssembly->'%(Identity).dll')" Condition="'%(Extension)' != '.dll'"/>
+            <_IvtPatchAssembly Include="@(IvtPatchAssembly)" Condition="'%(Extension)' == '.dll'"/>
+            <ManagedAssemblyToIvtPatch Include="@(ManagedAssemblyToLink)" Condition="'%(Filename)' != '' and '@(_IvtPatchAssembly)' != '' and '@(_LinkedResolvedFileToPublishCandidate->Exists())' != ''">
+                <TrimmedAssembly>@(_LinkedResolvedFileToPublishCandidate->Exists())</TrimmedAssembly>
+            </ManagedAssemblyToIvtPatch>
+            <_IvtPatchedResolvedFileToPublish Include="@(ManagedAssemblyToIvtPatch->'$(IntermediateIvtPatchDir)%(Filename)%(Extension)')" />
+        </ItemGroup>
+    </Target>
+</Project>

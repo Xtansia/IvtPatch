@@ -1,0 +1,86 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <Version>1.0.0</Version>
+        <AssemblyName>Xtansia.IvtPatch</AssemblyName>
+        <PackageId>Xtansia.IvtPatch</PackageId>
+        <Authors>Xtansia</Authors>
+        <Description>Patches ILLink trimmed assemblies to re-add InternalsVisibleTo attributes.</Description>
+        <Copyright>Copyright ©Xtansia 2023</Copyright>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <PackageLicenseExpression>MPL-2.0</PackageLicenseExpression>
+        <PackageProjectUrl>https://github.com/Xtansia/IvtPatch</PackageProjectUrl>
+
+        <TargetFramework>netstandard2.0</TargetFramework>
+        <LangVersion>10</LangVersion>
+
+        <BuildOutputTargetFolder>tasks</BuildOutputTargetFolder>
+        <NoWarn>NU5100;NU5128</NoWarn>
+        <GenerateDependencyFile>true</GenerateDependencyFile>
+        <IsPackable>true</IsPackable>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference
+                Include="Microsoft.Build.Utilities.Core"
+                Version="17.0.0"
+                PrivateAssets="all"
+                ExcludeAssets="Runtime"
+        />
+        <PackageReference 
+                Include="DotNet.ReproducibleBuilds" 
+                Version="1.1.1"
+                PrivateAssets="all"
+        />
+        <PackageReference
+                Include="Mono.Cecil"
+                Version="0.11.5"
+                PrivateAssets="all"
+                Pack="true"
+        />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include="..\README.md" Pack="true" PackagePath="\" />
+        <Content Include="build\Xtansia.IvtPatch.props" PackagePath="build\" />
+        <Content Include="build\Xtansia.IvtPatch.targets" PackagePath="build\" />
+    </ItemGroup>
+
+    <Target
+            Name="AddBuildDependencyFileToBuiltProjectOutputGroupOutput"
+            BeforeTargets="BuiltProjectOutputGroup"
+            Condition=" '$(GenerateDependencyFile)' == 'true'">
+
+        <ItemGroup>
+            <BuiltProjectOutputGroupOutput
+                    Include="$(ProjectDepsFilePath)"
+                    TargetPath="$(ProjectDepsFileName)"
+                    FinalOutputPath="$(ProjectDepsFilePath)" />
+        </ItemGroup>
+    </Target>
+
+    <Target Name="AddPackDependencies"
+            Inputs="@(RuntimeCopyLocalItems)"
+            Outputs="%(RuntimeCopyLocalItems.NuGetPackageId)"
+            DependsOnTargets="ResolvePackageAssets"
+            BeforeTargets="GenerateNuspec"
+            AfterTargets="ResolvePackageAssets">
+        <ItemGroup>
+            <NuGetPackageId Include="@(RuntimeCopyLocalItems->'%(NuGetPackageId)')" />
+        </ItemGroup>
+        <PropertyGroup>
+            <NuGetPackageId>@(NuGetPackageId->Distinct())</NuGetPackageId>
+        </PropertyGroup>
+        <ItemGroup>
+            <PackageReferenceDependency Include="@(PackageReference->WithMetadataValue('Identity', '$(NuGetPackageId)'))" />
+        </ItemGroup>
+        <PropertyGroup>
+            <NuGetPackagePack>@(PackageReferenceDependency->'%(Pack)')</NuGetPackagePack>
+        </PropertyGroup>
+        <ItemGroup Condition="'$(NuGetPackagePack)' == 'true'">
+            <_PackageFiles Include="@(RuntimeCopyLocalItems)" PackagePath="$(BuildOutputTargetFolder)/$(TargetFramework)/%(Filename)%(Extension)" />
+            <RuntimeCopyLocalItems Update="@(RuntimeCopyLocalItems)" CopyLocal="true" Private="true" />
+            <ResolvedFileToPublish Include="@(RuntimeCopyLocalItems)" CopyToPublishDirectory="PreserveNewest" RelativePath="%(Filename)%(Extension)" />
+        </ItemGroup>
+    </Target>
+</Project>
